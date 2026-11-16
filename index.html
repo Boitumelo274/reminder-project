@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Remindr" />
+    <meta name="theme-color" content="#2f6f5e" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <title>Remindr</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="toasts"></div>
+    <main>
+      <div class="top">
+        <h1>Remindr</h1>
+        <button class="sm" id="alertBtn">Enable notifications</button>
+      </div>
+      <p class="m" id="greet"></p>
+      <div id="view"></div>
+    </main>
+    <button id="fab" class="pri" aria-label="Add reminder">+</button>
+    <nav id="nav">
+      <button data-t="home" class="on"><span>🏠</span>Home</button>
+      <button data-t="cal"><span>📅</span>Calendar</button>
+      <button data-t="goals"><span>🎯</span>Goals</button>
+      <button data-t="hist"><span>✅</span>History</button>
+      <button data-t="more"><span>⚙️</span>More</button>
+    </nav>
+
+    <div id="sheet">
+      <form id="form">
+        <div class="top">
+          <b id="sheetTitle">New reminder</b
+          ><button type="button" class="sm" id="cancel">Close</button>
+        </div>
+        <div>
+          <label for="title">What do you want to do?</label
+          ><input
+            id="title"
+            required
+            maxlength="120"
+            placeholder="e.g. Study signals, gym, call mom"
+          />
+        </div>
+        <div class="row">
+          <div>
+            <label for="due">When</label
+            ><input id="due" type="datetime-local" required />
+          </div>
+          <div>
+            <label for="cat">Category</label
+            ><input
+              id="cat"
+              list="cats"
+              maxlength="24"
+              placeholder="Study, Gym…"
+            /><datalist id="cats"></datalist>
+          </div>
+        </div>
+        <div>
+          <label for="repeat">Repeat</label>
+          <select id="repeat">
+            <option value="none">Just once</option>
+            <option value="daily">Every day</option>
+            <option value="weekdays">Weekdays (Mon–Fri)</option>
+            <option value="custom">Specific days…</option>
+            <option value="weekly">Every week</option>
+            <option value="monthly">Every month</option>
+          </select>
+        </div>
+        <div class="days" id="days" style="display: none"></div>
+        <div class="row">
+          <div>
+            <label for="goalN">Goal: how many times? (optional)</label
+            ><input
+              id="goalN"
+              type="number"
+              min="1"
+              max="99"
+              inputmode="numeric"
+              placeholder="e.g. 3"
+            />
+          </div>
+          <div>
+            <label for="goalPer">Per</label
+            ><select id="goalPer">
+              <option value="week">week</option>
+              <option value="month">month</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="note">Note (optional)</label
+          ><input id="note" maxlength="200" />
+        </div>
+        <button class="pri" type="submit">Save</button>
+      </form>
+    </div>
+    <input
+      type="file"
+      id="file"
+      accept=".json,application/json"
+      style="display: none"
+    />
+
+    <script src="app.js"></script>
+  </body>
+</html>
