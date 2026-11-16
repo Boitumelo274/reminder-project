@@ -1,6 +1,9 @@
 (function () {
   var anim = false,
     dip = null,
+    ac = null,
+    wk = 0,
+    prefs = { sound: "chime", vol: 0.6, vib: true, custom: "" },
     KEY = "remindr:v2",
     OLD = "remindr:v1",
     items = [],
@@ -63,6 +66,33 @@
       } catch (e) {}
     });
   }
+  function hero(dn, left) {
+    var tot = dn + left,
+      p = tot ? dn / tot : 0,
+      C = 2 * Math.PI * 34,
+      off = C * (1 - p);
+    var msg =
+      left === 0
+        ? dn
+          ? "All done. Nice work!"
+          : "Nothing planned yet"
+        : left + (left === 1 ? " reminder" : " reminders") + " left today";
+    return (
+      '<div class="hero"><div><div class="hk">TODAY</div><div class="hm">' +
+      msg +
+      '</div><div class="m hs">' +
+      dn +
+      " done · " +
+      streak() +
+      ' day streak</div></div><svg class="ring" viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="34" class="rt"/><circle cx="40" cy="40" r="34" class="rp" style="stroke-dasharray:' +
+      C.toFixed(1) +
+      ";stroke-dashoffset:" +
+      off.toFixed(1) +
+      '" transform="rotate(-90 40 40)"/><text x="40" y="46" text-anchor="middle" class="rx">' +
+      Math.round(p * 100) +
+      "%</text></svg></div>"
+    );
+  }
   function rel(t) {
     var s = Math.round((t - Date.now()) / 60000),
       a = Math.abs(s),
@@ -101,7 +131,7 @@
       tag: it.id + ":" + it.due,
       icon: "icon-192.png",
       badge: "icon-192.png",
-      vibrate: [200, 100, 200],
+      vibrate: prefs.vib ? [200, 100, 200] : [],
       data: { id: it.id },
     };
     if (swReg && swReg.showNotification) {
@@ -124,6 +154,7 @@
       : "not supported in this browser";
   }
   function testNotif() {
+    playSound();
     if (!("Notification" in window) || Notification.permission !== "granted") {
       askPerm();
       return;
@@ -262,21 +293,252 @@
         el.remove();
       }, 4000);
   }
+  var SND = {
+    chime: {
+      n: "Chime",
+      w: "sine",
+      t: [
+        [784, 0, 0.18],
+        [988, 0.15, 0.18],
+        [1319, 0.3, 0.4],
+      ],
+    },
+    bell: {
+      n: "Bell",
+      w: "triangle",
+      t: [
+        [660, 0, 0.9],
+        [1320, 0, 0.5],
+      ],
+    },
+    pulse: {
+      n: "Pulse",
+      w: "square",
+      t: [
+        [520, 0, 0.12],
+        [520, 0.2, 0.12],
+        [520, 0.4, 0.12],
+      ],
+    },
+    beep: { n: "Beep", w: "sine", t: [[880, 0, 0.25]] },
+    soft: {
+      n: "Soft",
+      w: "sine",
+      t: [
+        [440, 0, 0.4],
+        [554, 0.2, 0.55],
+      ],
+    },
+  };
+  function loadPrefs() {
+    try {
+      var p = JSON.parse(localStorage.getItem("remindr:prefs") || "{}");
+      for (var k in p) prefs[k] = p[k];
+    } catch (e) {}
+    if (
+      prefs.sound !== "silent" &&
+      prefs.sound !== "custom" &&
+      !SND[prefs.sound]
+    )
+      prefs.sound = "chime";
+    if (prefs.sound === "custom" && !prefs.custom) prefs.sound = "chime";
+  }
+  function savePrefs() {
+    try {
+      localStorage.setItem("remindr:prefs", JSON.stringify(prefs));
+    } catch (e) {
+      toast("Couldn’t save that setting.");
+    }
+  }
+  function playSound(id) {
+    id = id || prefs.sound;
+    try {
+      if (id === "silent") return;
+      if (id === "custom" && prefs.custom) {
+        var au = new Audio(prefs.custom);
+        au.volume = prefs.vol;
+        var pp = au.play();
+        if (pp && pp.catch) pp.catch(function () {});
+        return;
+      }
+      var d = SND[id] || SND.chime;
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === "suspended") ac.resume();
+      var t0 = ac.currentTime,
+        v = Math.max(0.002, prefs.vol * 0.3);
+      d.t.forEach(function (n) {
+        var o = ac.createOscillator(),
+          g = ac.createGain();
+        o.type = d.w;
+        o.frequency.value = n[0];
+        o.connect(g);
+        g.connect(ac.destination);
+        g.gain.setValueAtTime(0.0001, t0 + n[1]);
+        g.gain.exponentialRampToValueAtTime(v, t0 + n[1] + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + n[1] + n[2]);
+        o.start(t0 + n[1]);
+        o.stop(t0 + n[1] + n[2] + 0.05);
+      });
+    } catch (e) {}
+  }
   function beep() {
+    playSound();
     try {
-      var a = new (window.AudioContext || window.webkitAudioContext)(),
-        o = a.createOscillator(),
-        g = a.createGain();
-      o.connect(g);
-      g.connect(a.destination);
-      o.frequency.value = 880;
-      g.gain.value = 0.08;
-      o.start();
-      o.stop(a.currentTime + 0.25);
+      if (prefs.vib && navigator.vibrate) navigator.vibrate([200, 100, 200]);
     } catch (e) {}
-    try {
-      navigator.vibrate && navigator.vibrate([200, 100, 200]);
-    } catch (e) {}
+  }
+  function wkStart(o) {
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + o * 7);
+    return d.getTime();
+  }
+  function review() {
+    var s = wkStart(wk),
+      ed = new Date(s);
+    ed.setDate(ed.getDate() + 7);
+    var e = ed.getTime(),
+      ps = wkStart(wk - 1);
+    var per = [0, 0, 0, 0, 0, 0, 0],
+      cs = {},
+      tot = 0,
+      prev = 0;
+    items.forEach(function (i) {
+      i.log.forEach(function (t) {
+        if (t >= s && t < e) {
+          per[(new Date(t).getDay() + 6) % 7]++;
+          tot++;
+          var c = i.cat || "No category";
+          cs[c] = (cs[c] || 0) + 1;
+        } else if (t >= ps && t < s) prev++;
+      });
+    });
+    var mx = Math.max(3, Math.max.apply(null, per)),
+      NM = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      ti = (new Date().getDay() + 6) % 7,
+      best = 0,
+      d = tot - prev;
+    per.forEach(function (v, i) {
+      if (v > per[best]) best = i;
+    });
+    var a = new Date(s),
+      b = new Date(s);
+    b.setDate(b.getDate() + 6);
+    var rg = { day: "numeric", month: "short" },
+      title =
+        wk === 0
+          ? "This week"
+          : wk === -1
+            ? "Last week"
+            : a.toLocaleDateString([], rg) +
+              " – " +
+              b.toLocaleDateString([], rg);
+    var h =
+      '<div class="wk"><button class="sm" data-a="pw" aria-label="Previous week">‹</button><div style="text-align:center"><b>' +
+      title +
+      '</b><div class="m">' +
+      a.toLocaleDateString([], rg) +
+      " – " +
+      b.toLocaleDateString([], rg) +
+      '</div></div><button class="sm" data-a="nw" aria-label="Next week"' +
+      (wk >= 0 ? " disabled" : "") +
+      ">›</button></div>";
+    h +=
+      '<div class="stats"><div class="card"><b>' +
+      tot +
+      '</b><span class="m">done this week</span></div><div class="card"><b>' +
+      (tot ? NM[best] : "–") +
+      '</b><span class="m">best day</span></div><div class="card"><b>' +
+      (d > 0 ? "+" : "") +
+      d +
+      '</b><span class="m">vs last week</span></div></div>';
+    var svg =
+      '<svg class="chart" viewBox="0 0 304 140" role="img" aria-label="Reminders completed per day">';
+    per.forEach(function (v, i) {
+      var x = 8 + i * 42,
+        hh = v ? (v / mx) * 92 : 3,
+        y = 106 - hh,
+        cur = wk === 0 && i === ti;
+      svg +=
+        '<rect class="bb' +
+        (v ? "" : " bz") +
+        (cur || (wk !== 0 && v) ? " t" : "") +
+        '" x="' +
+        x +
+        '" y="' +
+        y.toFixed(1) +
+        '" width="30" height="' +
+        hh.toFixed(1) +
+        '" rx="7"/>';
+      if (v)
+        svg +=
+          '<text class="cv" x="' +
+          (x + 15) +
+          '" y="' +
+          (y - 5).toFixed(1) +
+          '">' +
+          v +
+          "</text>";
+      svg +=
+        '<text class="cl' +
+        (cur ? " t" : "") +
+        '" x="' +
+        (x + 15) +
+        '" y="128">' +
+        NM[i] +
+        "</text>";
+    });
+    h += '<h2>Completed per day</h2><div class="card">' + svg + "</svg></div>";
+    var ck = Object.keys(cs).sort(function (x, y) {
+      return cs[y] - cs[x];
+    });
+    h +=
+      '<h2>By category</h2><div class="card">' +
+      (ck
+        .map(function (c) {
+          return (
+            '<div class="crow"><span class="nm">' +
+            esc(c) +
+            '</span><span class="tr"><i style="width:' +
+            (cs[c] / cs[ck[0]]) * 100 +
+            "%;background:" +
+            (c === "No category"
+              ? "var(--accent)"
+              : "hsl(" + hue(c) + ",55%,50%)") +
+            '"></i></span><b class="ct">' +
+            cs[c] +
+            "</b></div>"
+          );
+        })
+        .join("") || '<div class="m">Nothing completed this week yet.</div>') +
+      "</div>";
+    var gs = items.filter(function (i) {
+      return i.goalN && i.goalPer === "week";
+    });
+    if (gs.length)
+      h +=
+        '<h2>Weekly goals</h2><div class="card">' +
+        gs
+          .map(function (i) {
+            var c = i.log.filter(function (t) {
+              return t >= s && t < e;
+            }).length;
+            return (
+              '<div class="crow" style="display:block"><div class="t">' +
+              esc(i.title) +
+              ' <span class="m">' +
+              c +
+              " of " +
+              i.goalN +
+              (c >= i.goalN ? " ✓" : "") +
+              '</span></div><div class="bar"><i style="width:' +
+              Math.min(100, (c / i.goalN) * 100) +
+              '%"></i></div></div>'
+            );
+          })
+          .join("") +
+        "</div>";
+    return h;
   }
   function check() {
     var now = Date.now();
@@ -289,7 +551,7 @@
         notify(it);
       }
     });
-    if (!$("sheet").classList.contains("on")) render();
+    if (!$("sheet").classList.contains("on") && tab !== "more") render();
   }
   function complete(id) {
     var it = find(id);
@@ -316,9 +578,13 @@
     var over = it.due <= Date.now() && !it.finished,
       p = prog(it);
     var h =
-      '<div class="card item"><button class="chk" data-a="done" data-id="' +
+      '<div class="card item' +
+      (over ? " late" : "") +
+      '" style="--c:' +
+      (it.cat ? "hsl(" + hue(it.cat) + ",55%,50%)" : "var(--line)") +
+      '"><button class="chk" data-a="done" data-id="' +
       it.id +
-      '" aria-label="Mark done"></button><div class="mn">';
+      '" aria-label="Mark done"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button><div class="mn">';
     h += '<div class="t">' + dot(it.cat) + esc(it.title) + "</div>";
     h +=
       '<div class="m ' +
@@ -392,14 +658,14 @@
           if (dk(t) === td) dn++;
         });
       });
-      h =
-        '<div class="stats"><div class="card"><b>' +
-        tdn +
-        '</b><span class="m">due now</span></div><div class="card"><b>' +
-        dn +
-        '</b><span class="m">done today</span></div><div class="card"><b>' +
-        streak() +
-        '</b><span class="m">day streak</span></div></div>';
+      h = hero(
+        dn,
+        act.filter(function (i) {
+          var e = new Date();
+          e.setHours(23, 59, 59, 999);
+          return i.due <= e.getTime();
+        }).length,
+      );
       var cs = cats();
       if (cat !== "All" && cs.indexOf(cat) < 0) cat = "All";
       if (cs.length) {
@@ -435,11 +701,11 @@
       h +=
         "<h2>Today & overdue</h2>" +
         (a.map(card).join("") ||
-          '<div class="empty">All clear for today.</div>');
+          '<div class="empty"><span class="big">🌿</span>All clear for today.</div>');
       h +=
         "<h2>Upcoming</h2>" +
         (b.map(card).join("") ||
-          '<div class="empty">Nothing upcoming. Tap + to add one.</div>');
+          '<div class="empty"><span class="big">✨</span>Nothing upcoming. Tap + to add one.</div>');
     } else if (tab === "cal") {
       var y = calM.getFullYear(),
         mo = calM.getMonth(),
@@ -504,6 +770,7 @@
         return b.t - a.t;
       });
       h =
+        review() +
         "<h2>Completed</h2>" +
         (all
           .slice(0, 80)
@@ -522,6 +789,32 @@
     } else {
       h =
         '<h2>Backup</h2><div class="card"><div class="m" style="margin-bottom:10px">Your data lives in this browser. Export a copy to keep it safe or move it to another device.</div><div class="row"><button id="exp">Export backup</button><button id="imp">Import backup</button></div></div>';
+      h +=
+        '<h2>Sound</h2><div class="card"><div class="m" style="margin-bottom:10px">Plays when a reminder is due while the app is open. Tap one to hear it.</div><div class="snds">' +
+        Object.keys(SND)
+          .concat(["silent"])
+          .concat(prefs.custom ? ["custom"] : [])
+          .map(function (k) {
+            return (
+              '<button data-snd="' +
+              k +
+              '" class="' +
+              (prefs.sound === k ? "on" : "") +
+              '">' +
+              (k === "silent"
+                ? "Silent"
+                : k === "custom"
+                  ? "My file"
+                  : SND[k].n) +
+              "</button>"
+            );
+          })
+          .join("") +
+        '</div><div style="margin-top:12px"><label for="vol">Volume</label><input id="vol" type="range" min="0.1" max="1" step="0.05" value="' +
+        prefs.vol +
+        '"></div><label class="chkrow" style="margin-top:12px;font-size:14px;color:var(--ink)"><input type="checkbox" id="vib"' +
+        (prefs.vib ? " checked" : "") +
+        '> Vibrate</label><div class="row" style="margin-top:12px"><button id="upl">Upload my own sound</button></div><div class="m" style="margin-top:8px">When the app is closed, the phone plays its own notification sound. That is set in your phone’s settings, not by websites.</div></div>';
       h +=
         '<h2>Notifications</h2><div class="card"><div class="m" style="margin-bottom:10px">Status: <b>' +
         permText() +
@@ -544,6 +837,14 @@
     }
   }
   $("view").addEventListener("click", function (e) {
+    var sb = e.target.closest("[data-snd]");
+    if (sb) {
+      prefs.sound = sb.dataset.snd;
+      savePrefs();
+      playSound();
+      render();
+      return;
+    }
     var c = e.target.closest("[data-cat]");
     if (c) {
       cat = c.dataset.cat;
@@ -588,10 +889,19 @@
       } else if (a === "nm") {
         calM = new Date(calM.getFullYear(), calM.getMonth() + 1, 1);
         render();
+      } else if (a === "pw") {
+        wk--;
+        anim = true;
+        render();
+      } else if (a === "nw" && wk < 0) {
+        wk++;
+        anim = true;
+        render();
       }
       return;
     }
     if (e.target.id === "exp") exportData();
+    if (e.target.id === "upl") $("sfile").click();
     if (e.target.id === "tst") testNotif();
     if (e.target.id === "perm") askPerm();
     if (e.target.id === "inst" && dip) {
@@ -852,6 +1162,61 @@
       navigator.storage.persist &&
       navigator.storage.persist();
   } catch (e) {}
+  $("view").addEventListener("input", function (e) {
+    if (e.target.id === "vol") prefs.vol = parseFloat(e.target.value) || 0.6;
+  });
+  $("view").addEventListener("change", function (e) {
+    if (e.target.id === "vol") {
+      savePrefs();
+      playSound();
+    }
+    if (e.target.id === "vib") {
+      prefs.vib = e.target.checked;
+      savePrefs();
+      if (prefs.vib)
+        try {
+          navigator.vibrate && navigator.vibrate(60);
+        } catch (x) {}
+    }
+  });
+  $("sfile").addEventListener("change", function () {
+    var f = $("sfile").files[0];
+    if (!f) return;
+    if (f.type && f.type.indexOf("audio") !== 0) {
+      toast("Please pick an audio file.");
+      $("sfile").value = "";
+      return;
+    }
+    if (f.size > 700000) {
+      toast("That file is too big. Pick a sound under 700 KB.");
+      $("sfile").value = "";
+      return;
+    }
+    var r = new FileReader();
+    r.onload = function () {
+      prefs.custom = r.result;
+      prefs.sound = "custom";
+      savePrefs();
+      playSound();
+      render();
+      $("sfile").value = "";
+    };
+    r.onerror = function () {
+      toast("Couldn’t read that file.");
+    };
+    r.readAsDataURL(f);
+  });
+  document.addEventListener(
+    "pointerdown",
+    function () {
+      try {
+        ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+        if (ac.state === "suspended") ac.resume();
+      } catch (e) {}
+    },
+    { once: true },
+  );
+  loadPrefs();
   load();
   mirror();
   alertState();

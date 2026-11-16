@@ -15,13 +15,24 @@
     <link rel="icon" href="icon-192.png" />
     <link rel="apple-touch-icon" href="icon-192.png" />
     <title>Remindr</title>
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../CSS/style.css"
   </head>
   <body>
+    <div id="splash">
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 7.5V12l3 2" /></svg
+      ><b>Remindr</b>
+    </div>
     <div id="toasts"></div>
     <main>
       <div class="top">
-        <h1>Remindr</h1>
+        <h1>
+          <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="8.5" />
+            <path d="M12 7.5V12l3 2" /></svg
+          >Remindr
+        </h1>
         <button class="sm" id="alertBtn">Enable notifications</button>
       </div>
       <p class="m" id="greet"></p>
@@ -32,7 +43,7 @@
       <button data-t="home" class="on"><span>🏠</span>Home</button>
       <button data-t="cal"><span>📅</span>Calendar</button>
       <button data-t="goals"><span>🎯</span>Goals</button>
-      <button data-t="hist"><span>✅</span>History</button>
+      <button data-t="hist"><span>📊</span>Review</button>
       <button data-t="more"><span>⚙️</span>More</button>
     </nav>
 
@@ -105,6 +116,7 @@
         <button class="pri" type="submit">Save</button>
       </form>
     </div>
+    <input type="file" id="sfile" accept="audio/*" style="display: none" />
     <input
       type="file"
       id="file"
@@ -112,6 +124,6 @@
       style="display: none"
     />
 
-    <script src="app.js"></script>
+    <script src="../JavaScripts/app.js"></script>
   </body>
 </html>

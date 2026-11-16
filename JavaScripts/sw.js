@@ -1,4 +1,4 @@
-var V = "remindr-v1",
+var V = "remindr-v3",
   ASSETS = [
     "./",
     "index.html",
